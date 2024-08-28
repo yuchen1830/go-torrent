@@ -83,7 +83,7 @@ func unmarshalDict(p reflect.Value, dict map[string]*BObject) error {
 		return errors.New("dest must be pointer")
 	}
 	v := p.Elem()
-	// struct: fields
+	// struct: loop all fields
 	for  i, n := 0, v.NumField(); i < n; i++ {
 		fv := v.Field(i)
 		// accesses to the value of the i-th field, represents the value
@@ -92,11 +92,11 @@ func unmarshalDict(p reflect.Value, dict map[string]*BObject) error {
 		}
 		ft := v.Type().Field(i)
 		// accesses to the metadata of the i-th field, which contains multiple attributes
-		key := ft.Tag.Get("bencode")
+		key := ft.Tag.Get("bencode") // check the Tag first, otherwise make sure the key in struct is public
 		if key == "" {
 			key = strings.ToLower(ft.Name)
 		}
-		fo := dict[key]
+		fo := dict[key] // *BObject
 		if fo == nil {
 			continue
 		}
@@ -176,6 +176,7 @@ func Unmarshal(r io.Reader, s interface{}) error {
 	return nil
 }
 
+// basic: encode
 func marshalValue(w io.Writer, v reflect.Value) int {
 	len := 0
 	switch v.Kind() {
@@ -223,6 +224,7 @@ func marshalDict(w io.Writer, v reflect.Value) int {
 	return len
 }
 
+// struct / slice -> bencode
 func Marshal(w io.Writer, s interface{}) int {
 	v := reflect.ValueOf(s)
 	if v.Kind() == reflect.Ptr {
