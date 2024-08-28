@@ -2,11 +2,11 @@ package bencode
 
 import (
 	"errors"
+	// bencode "go-torrent"
 	"io"
 	"reflect"
-	"string"
-
-	"golang.org/x/tools/go/analysis/passes/unmarshal"
+	"strings"
+	// "golang.org/x/tools/go/analysis/passes/unmarshal"
 )
 
 // reflect: type interface{}; value {e.typ, e.word, flag}
@@ -83,12 +83,65 @@ func unmarshalDict(p reflect.Value, dict map[string]*BObject) error {
 		return errors.New("dest must be pointer")
 	}
 	v := p.Elem()
+	// struct: fields
 	for  i, n := 0, v.NumField(); i < n; i++ {
 		fv := v.Field(i)
+		// accesses to the value of the i-th field, represents the value
 		if !fv.CanSet() {
 			continue
 		}
+		ft := v.Type().Field(i)
+		// accesses to the metadata of the i-th field, which contains multiple attributes
+		key := ft.Tag.Get("bencode")
+		if key == "" {
+			key = strings.ToLower(ft.Name)
+		}
+		fo := dict[key]
+		if fo == nil {
+			continue
+		}
+		//  to provide the data that will be assigned to the struct's field
+		switch fo.type_ {
+		case BSTR:
+			if ft.Type.Kind() != reflect.String {
+				break
+			}
+			val, _ := fo.Str()
+			fv.SetString(val)
+		case BINT:
+			if ft.Type.Kind() != reflect.Int{
+				break
+			}
+			val, _ := fo.Int()
+			fv.SetInt(int64(val))
+		case BLIST:
+			if ft.Type.Kind() != reflect.Slice {
+				break
+			}
+			// to ensure that the value being set matches the type of the field
+			list, _ := fo.List()
+			lp := reflect.New(ft.Type)
+			ls := reflect.MakeSlice(ft.Type, len(list), len(list))
+			lp.Elem().Set(ls)
+			err := unmarshalList(lp, list)
+			if err != nil {
+				break
+			}
+			fv.Set(lp.Elem())
+		case BDICT:
+			if ft.Type.Kind() != reflect.Struct {
+				break
+			}
+			dp := reflect.New(ft.Type)
+			dict, _ := fo.Dict()
+			err := unmarshalDict(dp, dict)
+			if err != nil {
+				break
+			}
+			fv.Set(dp.Elem())
+		}
 	} 
+	return nil
 }
 
 func Unmarshal(r io.Reader, s interface{}) error {
@@ -114,6 +167,66 @@ func Unmarshal(r io.Reader, s interface{}) error {
 	case BDICT:
 		dict, _ := o.Dict()
 		err = unmarshalDict(p, dict)
-		
+		if err != nil {
+			return err
+		}
+	default:
+		return errors.New("src code must be struct or slice")
 	}
+	return nil
+}
+
+func marshalValue(w io.Writer, v reflect.Value) int {
+	len := 0
+	switch v.Kind() {
+	case reflect.String:
+		len += EncodeString(w, v.String())
+	case reflect.Int:
+		len += EncodeInt(w, int(v.Int()))
+	case reflect.Slice:
+		len += marshalList(w, v)
+	case reflect.Struct:
+		len += marshalDict(w, v)
+	}
+	return len
+}
+
+// l -- e
+func marshalList(w io.Writer, v reflect.Value) int {
+	len := 2
+	w.Write([]byte{'l'})
+	for i := 0; i < v.Len(); i++ {
+		ev := v.Index(i)
+		// marshal the nested elements
+		len += marshalValue(w, ev)
+	}
+	w.Write([]byte{'e'})
+	return len
+}
+
+// d -- e
+func marshalDict(w io.Writer, v reflect.Value) int {
+	len := 2
+	w.Write([]byte{'l'})
+	for i := 0; i < v.NumField(); i++ {
+		fv := v.Field(i)
+		ft := v.Type().Field(i)
+		key := ft.Tag.Get("bencode")
+		if key == "" {
+			key = strings.ToLower(ft.Name)
+		}
+		// marshal the nested elements
+		len += EncodeString(w, key)
+		len += marshalValue(w, fv)
+	}
+	w.Write([]byte{'e'})
+	return len
+}
+
+func Marshal(w io.Writer, s interface{}) int {
+	v := reflect.ValueOf(s)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+	return marshalValue(w, v)
 }
