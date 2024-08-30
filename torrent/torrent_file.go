@@ -6,21 +6,19 @@ import (
 	"fmt"
 	"go-torrent/bencode"
 	"io"
-
-	"github.com/yuchen1830/go-torrent/bencode"
 )
 
 // torrent file: announce + info(name, length, pieces, piece length)
-// 3 structs: 1.rawFile(2) 2.info(5) 3.torrentFile(6)
+// 3 structs with tags: 1.rawFile(2) 2.info(5) 3.torrentFile(6)
 type rawFile struct{
 	Announce	string `bencode:"announce"`
-	Info 	rawInfo `bencode:"info"`
+	Info	 	rawInfo `bencode:"info"`
 }
 
 type rawInfo struct {
-	Name	string `bencode:"name"`	
-	Length	int	`bencode:"length"`
-	Pieces	string `bencode:"pieces"`
+	Name		string `bencode:"name"`	
+	Length		int	`bencode:"length"`
+	Pieces		string `bencode:"pieces"`
 	PieceLength	int `bencode:"piece length"`
 }
 
@@ -28,7 +26,7 @@ const SHALEN int = 20
 
 type TorrentFile struct {
 	Announce	string
-	InfoSHA		[SHALEN]byte
+	InfoSHA		[SHALEN]byte // <- tracker
 	FileName	string
 	FileLen		int
 	PieceLen	int
@@ -42,6 +40,7 @@ func ParseFile(r io.Reader) (*TorrentFile, error) {
 		fmt.Println("Fail to parse torrent file")
 		return nil, err
 	}
+	// raw file -> torrent file
 	res := new(TorrentFile)
 	res.Announce = raw.Announce
 	res.FileName = raw.Info.Name
@@ -49,11 +48,12 @@ func ParseFile(r io.Reader) (*TorrentFile, error) {
 	res.PieceLen = raw.Info.PieceLength
 
 	// SHA-1
+	// TAG NOT USED?
 	buf := new(bytes.Buffer)
 	wlen := bencode.Marshal(buf, raw.Info)
 	// encodes raw.Info into the Bencode format and writes it into the buffer
 	if wlen == 0 {
-		fmt.Println("raw file into  error")
+		fmt.Println("raw file into error")
 	}
 	res.InfoSHA = shal.Sum(buf.Bytes())
 	// The buf.Bytes() method returns the byte slice of the buffer

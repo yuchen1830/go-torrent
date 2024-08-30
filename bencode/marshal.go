@@ -12,7 +12,7 @@ func unmarshalList(p reflect.Value, list []*BObject) error {
 	// check if the p is a pointer and ensure the value is addressable
 	// p is expected to be a pointer to a slice, not slice itself
 	if p.Kind() != reflect.Ptr || p.Elem().Kind() != reflect.Slice {
-		return errors.New("dest must be pointet to slice")
+		return errors.New("dest must be pointer to slice")
 	}
 	v := p.Elem() // slice, len(list)
 	if len(list) == 0 {
