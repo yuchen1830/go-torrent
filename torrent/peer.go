@@ -41,11 +41,11 @@ type PeerConn struct {
 	InfoSHA		[SHALEN]byte
 }
 
-// 1. handshake: 
+// 1. handshake: TCP
 func handshake(conn net.Conn, infoSHA [SHALEN]byte, peerId [IDLEN]byte) error {
 	conn.SetDeadline(time.Now().Add(3 * time.Second))
 	defer conn.SetDeadline(time.Time{})
-	
+	// create Msg
 	req := NewHandShakeMsg(infoSHA, peerId)
 	_, err := WriteHandShake(conn, req)
 	if err != nil {
@@ -129,6 +129,74 @@ func(c *PeerConn) WriteMsg(m *PeerMsg) (int, error) {
 
 func CopyPieceData(index int, buf []byte, msg *PeerMsg) (int, error) {
 	if msg.Id != MsgPiece {
-		
+		return 0, fmt.Errorf("expected MsgPiece")
 	}
+
+	if len(msg.Payload) < 8 {
+		return 0, fmt.Errorf("payload too short. %d < 8", len(msg.Payload))
+	}
+	parseIndex := int(binary.BigEndian.Uint32(msg.Payload[0:4]))
+	if parseIndex != index {
+		return 0, fmt.Errorf("expected index %d, got %d", index, parseIndex)
+	}
+	offset := int(binary.BigEndian.Uint32(msg.Payload[4:8]))
+	if offset >= len(buf) {
+		return 0, fmt.Errorf("offset too high. %d >= %d", offset, len(buf))
+	}
+	data := msg.Payload[8:]
+	if offset+len(data) > len(buf) {
+		return 0, fmt.Errorf("data too large [%d] for offest %d", len(data), offset, len(buf))
+	}
+	copy(buf[offset:], data)
+	return len(data), nil
 }
+
+func GetHaveIndex(msg *PeerMsg) (int, error) {
+	if msg.Id != MsgHave {
+		return 0, fmt.Errorf()
+	}
+	If len(msg.Payload) != 4 {
+		return 0, fmt.Errorf()
+	}
+	index := int()
+	return index, nil
+}
+
+func NewRequestMsg(index, offset, length int) *PeerMsg {
+	payload := make([]byte, 12)
+	binary
+
+	return &PeerMsg{MsgRequest, payload}
+}
+
+func NewConn(peer PeerInfo, infoSHA [SHALEN]byte, peerId [IDLEN]byte) (*PeerConn, error) {
+	addr := net.JoinHostPort(peer.Ip.String(), strconv.Itoa(int(peer.Port)))
+	conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
+	if err != nil {
+		fmt.Println("set tcp conn failed: " + addr)
+		return nil, err
+	}
+
+	err = handshake(conn, infoSHA, peerId)
+	if err != nil {
+		fmt.Println("handshake failed")
+		conn.Close()
+		return nil, err
+	}
+	c := &PeerConn{
+		Conn: 		conn,
+		Choked: 	true,
+		peer:		peer,
+		peerId: 	peerId,
+		InfoSHA: 	infoSHA,
+	}
+
+	err = fillBitfield(c)
+	if err != nil {
+		fmt.Println("fill bitfield failed, " + err.Error())
+		return nil, err
+	}
+	return c, nil
+}
+
+
