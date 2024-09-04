@@ -11,14 +11,14 @@ import (
 // torrent file: announce + info(name, length, pieces, piece length)
 // 3 structs with tags: 1.rawFile(2) 2.info(5) 3.torrentFile(6)
 type rawFile struct{
-	Announce	string `bencode:"announce"`
-	Info	 	rawInfo `bencode:"info"`
+	Announce	string	 `bencode:"announce"`
+	Info	 	rawInfo	 `bencode:"info"`
 }
 
 type rawInfo struct {
-	Name		string `bencode:"name"`	
-	Length		int	`bencode:"length"`
-	Pieces		string `bencode:"pieces"`
+	Name		string	 `bencode:"name"`	
+	Length		int		`bencode:"length"`
+	Pieces		string	 `bencode:"pieces"`
 	PieceLength	int `bencode:"piece length"`
 }
 
