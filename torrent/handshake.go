@@ -37,6 +37,7 @@ func WriteHandShake(w io.Writer, msg *HandshakeMsg) (int, error) {
 }
 
 func ReadHandshake(r io.Reader) (*HandshakeMsg, error) {
+	// create a buffer and read r supposed to be a TCP connection  
 	lenBuf := make([]byte, 1)
 	_, err := io.ReadFull(r, lenBuf)
 	if err != nil {
