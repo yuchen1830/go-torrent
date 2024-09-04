@@ -8,8 +8,6 @@ import (
 	"net"
 	"strconv"
 	"time"
-
-	"golang.org/x/tools/go/expect"
 )
 
 type MsgId uint8
@@ -187,7 +185,7 @@ func NewConn(peer PeerInfo, infoSHA [SHALEN]byte, peerId [IDLEN]byte) (*PeerConn
 	c := &PeerConn{
 		Conn: 		conn,
 		Choked: 	true,
-		peer:		peer,
+		Peer:		peer,
 		peerId: 	peerId,
 		InfoSHA: 	infoSHA,
 	}
