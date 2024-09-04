@@ -157,7 +157,7 @@ func (state *taskState) handleMsg() error {
 	case MsgUnchoke:
 		state.conn.Choked = false
 	case MsgHave: 
-	// onece a new piece is downloaded, the peer sends a Msg and updates bitfield 
+	// once a new piece is downloaded, the peer sends a Msg and updates bitfield 
 		index, err := GetHaveIndex(msg)
 		if err != nil {
 			return err
@@ -186,12 +186,15 @@ func downloadPiece(conn *PeerConn, task *pieceTask) (*pieceResult, error) {
 	defer conn.SetDeadline(time.Time{})
 
 	for state.downloaded < task.length {
+		// the connected peer must be unchoked
 		if !conn.Choked {
 			for state.backlog < MAXBLOCK && state.requested < task.length {
 				length := BLOCKSIZE
+				// corner case
 				if task.length - state.requested < length {
 					length = task.length - state.requested
 				}
+				// index, offset, blocksize
 				msg := NewRequestMsg(state.index, state.requested, length)
 				_, err := state.conn.WriteMsg(msg)
 				if err != nil {
@@ -206,6 +209,7 @@ func downloadPiece(conn *PeerConn, task *pieceTask) (*pieceResult, error) {
 			return nil, err
 		}
 	}
+	// check the result in peerRoutine
 	return &pieceResult{state.index, state.data}, nil
 }
 
