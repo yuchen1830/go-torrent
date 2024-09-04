@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"internal/msan"
 	"io"
 	"net"
 	"strconv"
@@ -29,7 +28,7 @@ const (
 
 type PeerMsg struct {
 	Id		MsgId
-	Payload []byte
+	Payload []byte // depends on the MsgId
 }
 
 type PeerConn struct {
@@ -41,7 +40,7 @@ type PeerConn struct {
 	InfoSHA		[SHALEN]byte
 }
 
-// 1. handshake: TCP
+// 1. handshake: TCP, and check the infoSHA
 func handshake(conn net.Conn, infoSHA [SHALEN]byte, peerId [IDLEN]byte) error {
 	conn.SetDeadline(time.Now().Add(3 * time.Second))
 	defer conn.SetDeadline(time.Time{})
@@ -153,19 +152,21 @@ func CopyPieceData(index int, buf []byte, msg *PeerMsg) (int, error) {
 
 func GetHaveIndex(msg *PeerMsg) (int, error) {
 	if msg.Id != MsgHave {
-		return 0, fmt.Errorf()
+		return 0, fmt.Errorf("expected MsgHave (Id %d), got Id %d", MsgHave, msg.Id)
 	}
-	If len(msg.Payload) != 4 {
-		return 0, fmt.Errorf()
+	if len(msg.Payload) != 4 {
+		return 0, fmt.Errorf("expected payload length 4, got length %d", len(msg.Payload))
 	}
-	index := int()
+	index := int(binary.BigEndian.Uint32(msg.Payload))
 	return index, nil
 }
 
+// 
 func NewRequestMsg(index, offset, length int) *PeerMsg {
 	payload := make([]byte, 12)
-	binary
-
+	binary.BigEndian.PutUint32(payload[0:4], uint32(index))
+	binary.BigEndian.PutUint32(payload[4:8], uint32(offset))
+	binary.BigEndian.PutUint32(payload[8:12], uint32(length))
 	return &PeerMsg{MsgRequest, payload}
 }
 
